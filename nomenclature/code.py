@@ -196,6 +196,30 @@ class VariableCode(Code):
             else self.pyam_agg_kwargs
         )
 
+    def validate_unit(self, unit: str | List[str]) -> bool:
+        """Checks whether `unit` is valid for this variable
+
+        Parameters
+        ----------
+        unit : str or list of str
+            Unit or list of unts to be checked for validity
+
+        Returns
+        -------
+        bool
+            True if `unit` is equal to or a subset of the allowed unit(s),
+            False otherwise.
+        """
+        exp_unit: Union[str, List[str]] = self.unit
+        # Fast-pass checks
+        if unit == exp_unit:
+            return True
+        if isinstance(exp_unit, str):
+            # If the expected unit is a string and not a list, the previous
+            # check should have passed if `unit` is valid
+            return False
+        # Full-fledged subset check
+        return set(to_list(unit)).issubset(exp_unit)
 
 class RegionCode(Code):
     """A subclass of Code specified for regions

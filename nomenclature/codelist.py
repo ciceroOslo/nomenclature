@@ -1,7 +1,7 @@
 from contextlib import suppress
 import logging
 from pathlib import Path
-from typing import ClassVar, Dict, List
+from typing import ClassVar, Dict, List, Literal
 
 import numpy as np
 import pandas as pd
@@ -15,6 +15,7 @@ from nomenclature.code import Code, MetaCode, RegionCode, VariableCode
 from nomenclature.config import NomenclatureConfig
 from nomenclature.error import custom_pydantic_errors, ErrorCollector
 from pyam.utils import is_list_like
+from pyam import IamDataFrame
 
 here = Path(__file__).parent.absolute()
 
@@ -556,6 +557,55 @@ class VariableCodeList(CodeList):
             if self[var].agg_kwargs and not self[var].skip_region_aggregation
         ]
 
+    def validate_units(
+            self,
+            df: IamDataFrame,
+            raise_on_missing_var: bool = False
+    ) -> pd.DataFrame | None:
+        """Validate that all units in an IamDataFrame are valid for this codelist
+
+        Parameters
+        ----------
+        df : :class:`pyam.IamDataFrame`
+            IamDataFrame to validate
+        raise_on_missing_var : bool, optional
+            If True, raise a KeyError if `df` contains variables that are not
+            defined in the codelist. If False, ignore such variables. Optional,
+            default: False.
+
+        Returns
+        -------
+        :class:`pandas.DataFrame` or None
+            DataFrame with invalid and expected units for each variable in `df`
+            that has an invalid unit. The DataFrame has the variable names in
+            the index, and two columns that each contain strings or lists of
+            strings:
+            - "invalid": the invalid unit or list of units. For variables with
+              multiple units, the element on the corresponding row will be a
+              list of all the units that occur in `df` for that variable,
+              including valid units in addition to the invalid one(s).
+            - "expected": the expected (i.e., valid) unit or list of units for
+              for each variable.
+
+        Raises
+        ------
+        KeyError
+            If `on_missing_var` is "raise" and `df` contains variables that are
+            not defined in the codelist.
+        """
+        invalid_units = []
+        for variable, unit in df.unit_mapping.items():
+            if variable in self:
+                if not self[variable].validate_unit(unit):
+                    invalid_units.append((variable, unit, self[variable].unit))
+            elif raise_on_missing_var:
+                raise KeyError(
+                    f"Variable '{variable}' is not defined in the codelist"
+                )
+        return pd.DataFrame(
+            data=invalid_units,
+            columns=["variable", "invalid", "expected"]
+        ).set_index("variable")
 
 class RegionCodeList(CodeList):
     """A subclass of CodeList specified for regions
