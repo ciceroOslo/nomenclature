@@ -1,7 +1,7 @@
 from contextlib import suppress
 import logging
 from pathlib import Path
-from typing import ClassVar, Dict, List, Literal
+from typing import ClassVar, Dict, List, Tuple, Literal
 
 import numpy as np
 import pandas as pd
@@ -593,19 +593,33 @@ class VariableCodeList(CodeList):
             If `on_missing_var` is "raise" and `df` contains variables that are
             not defined in the codelist.
         """
-        invalid_units = []
-        for variable, unit in df.unit_mapping.items():
-            if variable in self:
-                if not self[variable].validate_unit(unit):
-                    invalid_units.append((variable, unit, self[variable].unit))
-            elif raise_on_missing_var:
-                raise KeyError(
-                    f"Variable '{variable}' is not defined in the codelist"
-                )
-        return pd.DataFrame(
-            data=invalid_units,
-            columns=["variable", "invalid", "expected"]
-        ).set_index("variable")
+        # If raise_on_missing_var is False, check only the variables that are
+        # present in the codelist. If True, check all variables in the
+        # IamDataFrame, and let the KeyError propagate if any are not in the
+        # codelist.
+        df_vars: List[str] = df.variable
+        if not raise_on_missing_var:
+            check_vars: List[str] = \
+                [_var for _var in df_vars if _var in self]
+        else:
+            check_vars = df_vars
+        del df_vars
+        unit_validations: List[str | List[str] | None] = [
+            self[_var].validate_unit(df.unit_mapping[_var])
+            for _var in check_vars
+        ]
+        validation_df: pd.DataFrame = pd.DataFrame(
+            data={
+                "variable": check_vars,
+                "invalid": unit_validations
+            }
+        ).set_index("variable").loc[lambda df: df["invalid"].notnull()]
+        if validation_df.empty:
+            return None
+        validation_df["expected"] = [
+            self[_var].unit for _var in validation_df.index
+        ]
+        return validation_df
 
 class RegionCodeList(CodeList):
     """A subclass of CodeList specified for regions
