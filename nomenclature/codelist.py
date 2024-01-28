@@ -604,9 +604,11 @@ class VariableCodeList(CodeList):
         else:
             check_vars = df_vars
         del df_vars
+        unit_mappings: Dict[str, str] = df.unit_mapping
+        check_units: List[str] = [unit_mappings[_var] for _var in check_vars]
         unit_validations: List[str | List[str] | None] = [
-            self[_var].validate_unit(df.unit_mapping[_var])
-            for _var in check_vars
+            self[_var].validate_unit(_unit)
+            for _var, _unit in zip(check_vars, check_units)
         ]
         validation_df: pd.DataFrame = pd.DataFrame(
             data={
