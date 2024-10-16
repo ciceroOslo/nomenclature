@@ -94,8 +94,14 @@ class Repository(BaseModel):
         repo.git.checkout(self.revision)
         repo.git.reset("--hard")
         repo.git.clean("-xdf")
-        if self.revision == "main":
-            repo.remotes.origin.pull()
+        # Custom patch for IAM COMPACT: We need to be able to pull the latest
+        # commmit of not just the `main` branch. Not sure why this check is here
+        # in any case, except, except maybe that the original version assumes
+        # that any name other than `main` is a specific commit or unmoving tag,
+        # so that it doesn't need to be updated.
+        # if self.revision == "main":
+        #     repo.remotes.origin.pull()
+        repo.remotes.origin.pull()
         self.check_external_repo_double_stacking()
 
     def check_external_repo_double_stacking(self):
